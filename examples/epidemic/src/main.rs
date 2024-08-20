@@ -1,5 +1,6 @@
+use std::rc::{Rc, Weak};
 use kernel::{
-    Model, Entity, State, StateValue, Function, Process, Condition,
+    Model, Entity, State, StateValue, Function,
     DictionaryState, EntityType, RelationType, DictionaryParameter,
     SimpleProcess, AlwaysTrueCondition
 };
@@ -7,56 +8,77 @@ use kernel::{
 fn main() {
     let mut model = Model::new();
 
-    // Create an entity
+    // Create the first entity (MovingEntity)
     let mut state = DictionaryState::new();
     state.set("position".to_string(), StateValue::Array(vec![StateValue::Integer(0), StateValue::Integer(0)]));
-
-    let move_condition = Box::new(AlwaysTrueCondition {});
-    let move_process = Box::new(SimpleProcess {
-        condition: move_condition,
-        action: |entity| {
-            let mut state = entity.state.borrow_mut();
-            if let Some(StateValue::Array(position)) = state.get("position") {
-                if let (StateValue::Integer(x), StateValue::Integer(y)) = (&position[0], &position[1]) {
-                    let new_position = StateValue::Array(vec![
-                        StateValue::Integer(x + 1),
-                        StateValue::Integer(y + 1)
-                    ]);
-                    state.set("position".to_string(), new_position);
-                }
-            }
-        },
-    });
-
-    let mut parameter = DictionaryParameter::new();
-    parameter.set("speed".to_string(), StateValue::Integer(1));
-
-    let function = Function {
-        parameter: Box::new(parameter),
-        processes: vec![move_process],
-    };
-
-    let mut entity = Entity::new(
-        1,
+    
+    let moving_entity = Rc::new(Entity::new(
+        "MovingEntity".to_string(),
         EntityType::Custom("MovingEntity".to_string()),
         Box::new(state)
+    ));
+
+    // Create a function for the moving entity
+    let mut parameter = DictionaryParameter::new();
+    parameter.set("speed".to_string(), StateValue::Integer(1));
+    
+    let move_function = Rc::new(Function::new(
+        "MoveFunction".to_string(),
+        Box::new(parameter),
+        Rc::downgrade(&moving_entity)
+    ));
+
+    // Create a process for the move function
+    let move_condition = Box::new(AlwaysTrueCondition {});
+    let move_process = SimpleProcess::new(
+        "MoveProcess".to_string(),
+        move_condition,
+        Box::new({
+            let weak_function = Rc::downgrade(&move_function);
+            move || {
+                if let Some(function) = weak_function.upgrade() {
+                    if let Some(entity) = function.owner.upgrade() {
+                        let mut state = entity.state.borrow_mut();
+                        if let Some(StateValue::Array(position)) = state.get("position") {
+                            if let (StateValue::Integer(x), StateValue::Integer(y)) = (&position[0], &position[1]) {
+                                let new_position = StateValue::Array(vec![
+                                    StateValue::Integer(x + 1),
+                                    StateValue::Integer(y + 1)
+                                ]);
+                                state.set("position".to_string(), new_position);
+                            }
+                        }
+                    }
+                }
+            }
+        }),
+        Rc::downgrade(&move_function)
     );
-    entity.functions.push(function);
 
-    model.add_entity(entity);
+    // Add the process to the function
+    move_function.add_process(move_process);
 
-    // Create another entity and add a relation
+    // Add the function to the entity
+    moving_entity.add_function(move_function);
+
+    // Add the moving entity to the model
+    model.add_entity(moving_entity.clone());
+
+    // Create the second entity (StaticEntity)
     let mut state2 = DictionaryState::new();
-    state2.set("name".to_string(), StateValue::String("Entity 2".to_string()));
-    let entity2 = Entity::new(
-        2,
+    state2.set("name".to_string(), StateValue::String("StaticEntity".to_string()));
+    
+    let static_entity = Rc::new(Entity::new(
+        "StaticEntity".to_string(),
         EntityType::Custom("StaticEntity".to_string()),
         Box::new(state2)
-    );
-    model.add_entity(entity2);
+    ));
+
+    // Add the static entity to the model
+    model.add_entity(static_entity.clone());
 
     // Add a relation between entities
-    model.entities[0].add_relation(2, RelationType::Custom("Observes".to_string()));
+    moving_entity.add_relation(static_entity.id, RelationType::Custom("Observes".to_string()));
 
     // Run simulation
     model.simulate(10);
@@ -66,7 +88,7 @@ fn main() {
 
     // Print relations
     for entity in &model.entities {
-        println!("Entity {} relations:", entity.id);
+        println!("Entity {} relations:", entity.name);
         for (relation_type, targets) in entity.get_relations() {
             println!("  {:?}: {:?}", relation_type, targets);
         }

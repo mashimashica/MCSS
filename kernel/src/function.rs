@@ -1,12 +1,36 @@
-use std::collections::HashMap;
+use std::cell::RefCell;
+use std::rc::{Rc, Weak};
 use std::fmt;
+use std::collections::HashMap;
+use uuid::Uuid;
 use crate::state::StateValue;
 use crate::process::Process;
+use crate::process::SimpleProcess;
+use crate::entity::Entity;
 
 #[derive(Debug)]
 pub struct Function {
+    pub id: Uuid,
+    pub name: String,
     pub parameter: Box<dyn Parameter>,
-    pub processes: Vec<Box<dyn Process>>,
+    pub processes: RefCell<Vec<Rc<dyn Process>>>,
+    pub owner: Weak<Entity>,
+}
+
+impl Function {
+    pub fn new(name: String, parameter: Box<dyn Parameter>, owner: Weak<Entity>) -> Self {
+        Function {
+            id: Uuid::new_v4(),
+            name,
+            parameter,
+            processes: RefCell::new(Vec::new()),
+            owner,
+        }
+    }
+
+    pub fn add_process(&self, process: Rc<SimpleProcess>) {
+        self.processes.borrow_mut().push(process);
+    }
 }
 
 pub trait Parameter: fmt::Debug {

@@ -1,8 +1,9 @@
 use std::fmt;
+use std::rc::Rc;
 use crate::entity::Entity;
 
 pub struct Model {
-    pub entities: Vec<Entity>,
+    pub entities: Vec<Rc<Rc<Entity>>>,
     pub time: u32,
 }
 
@@ -14,24 +15,20 @@ impl Model {
         }
     }
 
-    pub fn add_entity(&mut self, entity: Entity) {
+    pub fn add_entity(&mut self, entity: Rc<Rc<Entity>>) {
         self.entities.push(entity);
     }
 
     fn proceed(&mut self) {
         for entity in &self.entities {
-            let mut to_execute = Vec::new();
-            
-            for function in &entity.functions {
-                for process in &function.processes {
-                    if process.check_condition(entity) {
-                        to_execute.push(process);
+            let functions = entity.functions.borrow();
+            for function in functions.iter() {
+                let processes = function.processes.borrow();
+                for process in processes.iter() {
+                    if process.check_condition() {
+                        process.execute();
                     }
                 }
-            }
-            
-            for process in to_execute {
-                process.execute(entity);
             }
         }
         self.time += 1;
