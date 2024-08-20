@@ -1,11 +1,10 @@
 use std::cell::RefCell;
-use std::rc::{Rc, Weak};
+use std::rc::Weak;
 use std::fmt;
 use std::collections::HashMap;
 use uuid::Uuid;
 use crate::state::StateValue;
 use crate::process::Process;
-use crate::process::SimpleProcess;
 use crate::entity::Entity;
 
 #[derive(Debug)]
@@ -13,7 +12,7 @@ pub struct Function {
     pub id: Uuid,
     pub name: String,
     pub parameter: Box<dyn Parameter>,
-    pub processes: RefCell<Vec<Rc<dyn Process>>>,
+    pub processes: RefCell<Vec<Process>>,
     pub owner: Weak<Entity>,
 }
 
@@ -28,7 +27,7 @@ impl Function {
         }
     }
 
-    pub fn add_process(&self, process: Rc<SimpleProcess>) {
+    pub fn add_process(&self, process: Process) {
         self.processes.borrow_mut().push(process);
     }
 }

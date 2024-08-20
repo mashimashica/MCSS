@@ -8,6 +8,6 @@ mod types;
 pub use entity::Entity;
 pub use state::{State, StateValue, DictionaryState};
 pub use function::{Function, Parameter, DictionaryParameter};
-pub use process::{Process, Condition, SimpleProcess, AlwaysTrueCondition};
+pub use process::{Process, Condition, AlwaysTrueCondition};
 pub use model::Model;
 pub use types::{EntityType, RelationType};

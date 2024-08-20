@@ -1,8 +1,8 @@
-use std::rc::{Rc, Weak};
+use std::rc::Rc;
 use kernel::{
     Model, Entity, State, StateValue, Function,
     DictionaryState, EntityType, RelationType, DictionaryParameter,
-    SimpleProcess, AlwaysTrueCondition
+    Process, AlwaysTrueCondition
 };
 
 fn main() {
@@ -10,7 +10,10 @@ fn main() {
 
     // Create the first entity (MovingEntity)
     let mut state = DictionaryState::new();
-    state.set("position".to_string(), StateValue::Array(vec![StateValue::Integer(0), StateValue::Integer(0)]));
+    state.set("position".to_string(), StateValue::Array(vec![
+        StateValue::Integer(0),
+        StateValue::Integer(0)
+    ].into()));
     
     let moving_entity = Rc::new(Entity::new(
         "MovingEntity".to_string(),
@@ -29,30 +32,27 @@ fn main() {
     ));
 
     // Create a process for the move function
-    let move_condition = Box::new(AlwaysTrueCondition {});
-    let move_process = SimpleProcess::new(
+    let weak_function = Rc::downgrade(&move_function);
+    let move_process = Process::new(
         "MoveProcess".to_string(),
-        move_condition,
-        Box::new({
-            let weak_function = Rc::downgrade(&move_function);
-            move || {
-                if let Some(function) = weak_function.upgrade() {
-                    if let Some(entity) = function.owner.upgrade() {
-                        let mut state = entity.state.borrow_mut();
-                        if let Some(StateValue::Array(position)) = state.get("position") {
-                            if let (StateValue::Integer(x), StateValue::Integer(y)) = (&position[0], &position[1]) {
-                                let new_position = StateValue::Array(vec![
-                                    StateValue::Integer(x + 1),
-                                    StateValue::Integer(y + 1)
-                                ]);
-                                state.set("position".to_string(), new_position);
-                            }
+        Box::new(AlwaysTrueCondition {}),
+        weak_function.clone(),
+        Box::new(move || {
+            if let Some(function) = weak_function.upgrade() {
+                if let Some(entity) = function.owner.upgrade() {
+                    let mut state = entity.state.borrow_mut();
+                    if let Some(StateValue::Array(position)) = state.get("position") {
+                        if let (StateValue::Integer(x), StateValue::Integer(y)) = (&position[0], &position[1]) {
+                            let new_position = StateValue::Array(vec![
+                                StateValue::Integer(x + 1),
+                                StateValue::Integer(y + 1)
+                            ].into());
+                            state.set("position".to_string(), new_position);
                         }
                     }
                 }
             }
-        }),
-        Rc::downgrade(&move_function)
+        })
     );
 
     // Add the process to the function
