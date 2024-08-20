@@ -2,9 +2,4 @@
 
 Rust言語による社会システムモデリング&シミュレーション
 
-## 基本概念
-### Entity
-
-### Function
-
-### Process
+![image](https://github.com/user-attachments/assets/34e47eef-35d0-421e-9f5e-30ddded9ec49)
