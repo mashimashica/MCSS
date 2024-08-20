@@ -1,0 +1,11 @@
+[package]
+name = "epidemic-example"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "epidemic"
+path = "src/main.rs"
+
+[dependencies]
+kernel = { path = "../../kernel" }

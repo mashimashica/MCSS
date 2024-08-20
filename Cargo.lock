@@ -3,5 +3,19 @@
 version = 3
 
 [[package]]
+name = "epidemic-example"
+version = "0.1.0"
+dependencies = [
+ "kernel",
+]
+
+[[package]]
+name = "kernel"
+version = "0.1.0"
+
+[[package]]
 name = "mcss"
 version = "0.1.0"
+dependencies = [
+ "kernel",
+]

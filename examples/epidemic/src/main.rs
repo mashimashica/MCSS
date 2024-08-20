@@ -1,10 +1,7 @@
-// src/main.rs
-
-mod kernel;
-
 use kernel::{
     Model, Entity, State, StateValue, Function, Process, Condition,
-    DictionaryState, EntityType, RelationType, DictionaryParameter
+    DictionaryState, EntityType, RelationType, DictionaryParameter,
+    SimpleProcess, AlwaysTrueCondition
 };
 
 fn main() {
@@ -73,30 +70,5 @@ fn main() {
         for (relation_type, targets) in entity.get_relations() {
             println!("  {:?}: {:?}", relation_type, targets);
         }
-    }
-}
-
-#[derive(Debug)]
-struct SimpleProcess {
-    pub condition: Box<dyn Condition>,
-    pub action: fn(&Entity),
-}
-
-impl Process for SimpleProcess {
-    fn execute(&self, entity: &Entity) {
-        (self.action)(entity);
-    }
-
-    fn check_condition(&self, entity: &Entity) -> bool {
-        self.condition.is_met(entity)
-    }
-}
-
-#[derive(Debug)]
-struct AlwaysTrueCondition {}
-
-impl Condition for AlwaysTrueCondition {
-    fn is_met(&self, _entity: &Entity) -> bool {
-        true
     }
 }

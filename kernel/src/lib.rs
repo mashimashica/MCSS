@@ -13,9 +13,9 @@ pub enum EntityType {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RelationType {
-    Friend,
-    Family,
-    Colleague,
+    OneOnOne, // 1:1 関係
+    Include, // 1:N 関係
+    Exist, // N:1 関係
     Custom(String),
 }
 
@@ -193,5 +193,30 @@ impl fmt::Display for Model {
             writeln!(f, "Entity {}: {:?}", i, entity)?;
         }
         Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub struct SimpleProcess {
+    pub condition: Box<dyn Condition>,
+    pub action: fn(&Entity),
+}
+
+impl Process for SimpleProcess {
+    fn execute(&self, entity: &Entity) {
+        (self.action)(entity);
+    }
+
+    fn check_condition(&self, entity: &Entity) -> bool {
+        self.condition.is_met(entity)
+    }
+}
+
+#[derive(Debug)]
+pub struct AlwaysTrueCondition {}
+
+impl Condition for AlwaysTrueCondition {
+    fn is_met(&self, _entity: &Entity) -> bool {
+        true
     }
 }

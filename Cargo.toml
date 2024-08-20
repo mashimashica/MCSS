@@ -1,6 +1,17 @@
+[workspace]
+members = [
+    "kernel",
+    "examples/epidemic",
+]
+
 [package]
 name = "mcss"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+kernel = { path = "./kernel" }
+
+[[example]]
+name = "epidemic"
+path = "examples/epidemic/src/main.rs"
