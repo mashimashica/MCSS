@@ -1,7 +1,7 @@
 use std::rc::Rc;
 use kernel::{
-    Model, Entity, State, StateValue, Function,
-    DictionaryState, EntityType, RelationType, DictionaryParameter,
+    Model, Entity, State, StateValue, Function, Parameter,
+    EntityType, RelationType,
     Process, AlwaysTrueCondition
 };
 
@@ -9,7 +9,7 @@ fn main() {
     let mut model = Model::new();
 
     // Create the first entity (MovingEntity)
-    let mut state = DictionaryState::new();
+    let mut state = State::new();
     state.set("position".to_string(), StateValue::Array(vec![
         StateValue::Integer(0),
         StateValue::Integer(0)
@@ -18,24 +18,23 @@ fn main() {
     let moving_entity = Rc::new(Entity::new(
         "MovingEntity".to_string(),
         EntityType::Custom("MovingEntity".to_string()),
-        Box::new(state)
+        state
     ));
 
     // Create a function for the moving entity
-    let mut parameter = DictionaryParameter::new();
+    let mut parameter = Parameter::new();
     parameter.set("speed".to_string(), StateValue::Integer(1));
     
     let move_function = Rc::new(Function::new(
         "MoveFunction".to_string(),
-        Box::new(parameter),
+        parameter,
         Rc::downgrade(&moving_entity)
     ));
 
     // Create a process for the move function
     let weak_function = Rc::downgrade(&move_function);
-    let move_process = Process::new(
+    let mut move_process = Process::new(
         "MoveProcess".to_string(),
-        Box::new(AlwaysTrueCondition {}),
         weak_function.clone(),
         Box::new(move || {
             if let Some(function) = weak_function.upgrade() {
@@ -55,6 +54,8 @@ fn main() {
         })
     );
 
+    move_process.set_condition(Box::new(AlwaysTrueCondition {}));
+
     // Add the process to the function
     move_function.add_process(move_process);
 
@@ -65,13 +66,13 @@ fn main() {
     model.add_entity(moving_entity.clone());
 
     // Create the second entity (StaticEntity)
-    let mut state2 = DictionaryState::new();
+    let mut state2 = State::new();
     state2.set("name".to_string(), StateValue::String("StaticEntity".to_string()));
     
     let static_entity = Rc::new(Entity::new(
         "StaticEntity".to_string(),
         EntityType::Custom("StaticEntity".to_string()),
-        Box::new(state2)
+        state2
     ));
 
     // Add the static entity to the model

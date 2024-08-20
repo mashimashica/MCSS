@@ -11,13 +11,13 @@ pub struct Entity {
     pub id: Uuid,
     pub name: String,
     pub entity_type: EntityType,
-    pub state: RefCell<Box<dyn State>>,
+    pub state: RefCell<State>,
     pub functions: RefCell<Vec<Rc<Function>>>,
     pub relations: RefCell<HashMap<RelationType, Vec<Uuid>>>,
 }
 
 impl Entity {
-    pub fn new(name: String, entity_type: EntityType, state: Box<dyn State>) -> Rc<Self> {
+    pub fn new(name: String, entity_type: EntityType, state: State) -> Rc<Self> {
         Rc::new(Entity {
             id: Uuid::new_v4(),
             name,

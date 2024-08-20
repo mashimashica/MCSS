@@ -9,19 +9,19 @@ use crate::entity::Entity;
 
 #[derive(Debug)]
 pub struct Function {
-    pub id: Uuid,
+    // pub id: Uuid,
     pub name: String,
-    pub parameter: Box<dyn Parameter>,
+    pub parameter: RefCell<Parameter>,
     pub processes: RefCell<Vec<Process>>,
     pub owner: Weak<Entity>,
 }
 
 impl Function {
-    pub fn new(name: String, parameter: Box<dyn Parameter>, owner: Weak<Entity>) -> Self {
+    pub fn new(name: String, parameter: Parameter, owner: Weak<Entity>) -> Self {
         Function {
-            id: Uuid::new_v4(),
+            // id: Uuid::new_v4(),
             name,
-            parameter,
+            parameter: RefCell::new(parameter),
             processes: RefCell::new(Vec::new()),
             owner,
         }
@@ -32,18 +32,19 @@ impl Function {
     }
 }
 
-pub trait Parameter: fmt::Debug {
-    fn get(&self, key: &str) -> Option<&StateValue>;
-}
+// pub trait Parameter: fmt::Debug {
+//     fn get(&self, key: &str) -> Option<&StateValue>;
+//     fn set(&mut self, key: String, value: StateValue);
+// }
 
 #[derive(Debug)]
-pub struct DictionaryParameter {
+pub struct Parameter {
     values: HashMap<String, StateValue>,
 }
 
-impl DictionaryParameter {
+impl Parameter {
     pub fn new() -> Self {
-        DictionaryParameter {
+        Parameter {
             values: HashMap::new(),
         }
     }
@@ -51,10 +52,8 @@ impl DictionaryParameter {
     pub fn set(&mut self, key: String, value: StateValue) {
         self.values.insert(key, value);
     }
-}
 
-impl Parameter for DictionaryParameter {
-    fn get(&self, key: &str) -> Option<&StateValue> {
+    pub fn get(&self, key: &str) -> Option<&StateValue> {
         self.values.get(key)
     }
 }

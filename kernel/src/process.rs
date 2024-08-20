@@ -1,31 +1,34 @@
 use std::fmt;
 use std::rc::Weak;
-use uuid::Uuid;
+// use uuid::Uuid;
 use crate::Function;
 use crate::Entity;
 
 pub struct Process {
-    pub id: Uuid,
+    // pub id: Uuid,
     pub name: String,
     pub owner: Weak<Function>,
-    condition: Box<dyn Condition>,
+    condition: Option<Box<dyn Condition>>,
     action: Box<dyn Fn() + 'static>,
 }
 
 impl Process {
     pub fn new(
         name: String,
-        condition: Box<dyn Condition>,
         owner: Weak<Function>,
         action: Box<dyn Fn() + 'static>,
     ) -> Self {
         Process {
-            id: Uuid::new_v4(),
+            // id: Uuid::new_v4(),
             name,
             owner,
-            condition,
+            condition: None,
             action,
         }
+    }
+
+    pub fn set_condition(&mut self, condition: Box<dyn Condition>) {
+        self.condition = Some(condition);
     }
 
     pub fn execute(&self) {
@@ -33,9 +36,11 @@ impl Process {
     }
 
     pub fn check_condition(&self) -> bool {
-        if let Some(function) = self.owner.upgrade() {
-            if let Some(owner_entity) = function.owner.upgrade() {
-                return self.condition.is_met(&owner_entity);
+        if let Some(condition) = &self.condition {
+            if let Some(function) = self.owner.upgrade() {
+                if let Some(owner_entity) = function.owner.upgrade() {
+                    return condition.is_met(&owner_entity);
+                }
             }
         }
         false
@@ -45,9 +50,10 @@ impl Process {
 impl fmt::Debug for Process {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Process")
-            .field("id", &self.id)
+            // .field("id", &self.id)
             .field("name", &self.name)
             .field("owner", &self.owner)
+            .field("condition", &self.condition.is_some())
             .finish()
     }
 }

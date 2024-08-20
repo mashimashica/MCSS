@@ -1,30 +1,27 @@
 use std::collections::HashMap;
 use std::fmt;
 
-pub trait State: fmt::Debug {
-    fn get(&self, key: &str) -> Option<&StateValue>;
-    fn set(&mut self, key: String, value: StateValue);
-}
+// pub trait State: fmt::Debug {
+//     fn get(&self, key: &str) -> Option<&StateValue>;
+//     fn set(&mut self, key: String, value: StateValue);
+// }
 
 #[derive(Debug)]
-pub struct DictionaryState {
+pub struct State {
     values: HashMap<String, StateValue>,
 }
 
-impl DictionaryState {
+impl State {
     pub fn new() -> Self {
-        DictionaryState {
+        State {
             values: HashMap::new(),
         }
     }
-}
-
-impl State for DictionaryState {
-    fn get(&self, key: &str) -> Option<&StateValue> {
+    pub fn get(&self, key: &str) -> Option<&StateValue> {
         self.values.get(key)
     }
 
-    fn set(&mut self, key: String, value: StateValue) {
+    pub fn set(&mut self, key: String, value: StateValue) {
         self.values.insert(key, value);
     }
 }
