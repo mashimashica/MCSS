@@ -1,11 +1,9 @@
 use std::fmt;
 use std::rc::Weak;
-// use uuid::Uuid;
-use crate::Function;
-use crate::Entity;
+use crate::function::Function;
+use crate::entity::Entity;
 
 pub struct Process {
-    // pub id: Uuid,
     pub name: String,
     pub owner: Weak<Function>,
     condition: Option<Box<dyn Condition>>,
@@ -19,7 +17,6 @@ impl Process {
         action: Box<dyn Fn() + 'static>,
     ) -> Self {
         Process {
-            // id: Uuid::new_v4(),
             name,
             owner,
             condition: None,
@@ -50,7 +47,6 @@ impl Process {
 impl fmt::Debug for Process {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Process")
-            // .field("id", &self.id)
             .field("name", &self.name)
             .field("owner", &self.owner)
             .field("condition", &self.condition.is_some())

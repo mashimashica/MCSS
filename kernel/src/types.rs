@@ -1,3 +1,5 @@
+use std::fmt;
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum EntityType {
     Person,
@@ -7,10 +9,33 @@ pub enum EntityType {
     Custom(String),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+impl fmt::Display for EntityType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            EntityType::Person => write!(f, "Person"),
+            EntityType::Household => write!(f, "Household"),
+            EntityType::Organization => write!(f, "Organization"),
+            EntityType::Location => write!(f, "Location"),
+            EntityType::Custom(s) => write!(f, "Custom({})", s),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RelationType {
-    OneOnOne, // 1:1 関係
-    Include,  // 1:N 関係
-    Exist,    // N:1 関係
-    Custom(String),
+    OneToOne,
+    OneToMany,
+    ManyToOne,
+    ManyToMany,
+}
+
+impl fmt::Display for RelationType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            RelationType::OneToOne => write!(f, "OneToOne"),
+            RelationType::OneToMany => write!(f, "OneToMany"),
+            RelationType::ManyToOne => write!(f, "ManyToOne"),
+            RelationType::ManyToMany => write!(f, "ManyToMany"),
+        }
+    }
 }

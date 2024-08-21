@@ -13,6 +13,7 @@ name = "epidemic-example"
 version = "0.1.0"
 dependencies = [
  "kernel",
+ "uuid",
 ]
 
 [[package]]

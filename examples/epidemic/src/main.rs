@@ -1,97 +1,104 @@
 use std::rc::Rc;
+use std::cell::RefCell;
 use kernel::{
-    Model, Entity, State, StateValue, Function, Parameter,
-    EntityType, RelationType,
-    Process, AlwaysTrueCondition
+    Model,
+    EntityType,
+    RelationType,
+    Value,
+    Function,
+    Process,
 };
 
 fn main() {
-    let mut model = Model::new();
+    // モデルの作成
+    let model = Rc::new(RefCell::new(Model::new()));
 
-    // Create the first entity (MovingEntity)
-    let mut state = State::new();
-    state.set("position".to_string(), StateValue::Array(vec![
-        StateValue::Integer(0),
-        StateValue::Integer(0)
-    ].into()));
-    
-    let moving_entity = Rc::new(Entity::new(
-        "MovingEntity".to_string(),
-        EntityType::Custom("MovingEntity".to_string()),
-        state
-    ));
+    // エンティティの作成
+    let john = model.borrow_mut().create_entity("John".to_string(), EntityType::Person);
+    let mary = model.borrow_mut().create_entity("Mary".to_string(), EntityType::Person);
+    let acme_corp = model.borrow_mut().create_entity("Acme Corporation".to_string(), EntityType::Organization);
+    let central_park = model.borrow_mut().create_entity("Central Park".to_string(), EntityType::Location);
 
-    // Create a function for the moving entity
-    let mut parameter = Parameter::new();
-    parameter.set("speed".to_string(), StateValue::Integer(1));
-    
-    let move_function = Rc::new(Function::new(
-        "MoveFunction".to_string(),
-        parameter,
-        Rc::downgrade(&moving_entity)
-    ));
+    // 関係の追加
+    let _ = model.borrow_mut().add_relation(
+        "works_at".to_string(),
+        RelationType::ManyToOne,
+        &john.id,
+        &acme_corp.id,
+    );
+    let _ = model.borrow_mut().add_relation(
+        "works_at".to_string(),
+        RelationType::ManyToOne,
+        &mary.id,
+        &acme_corp.id,
+    );
+    let _ = model.borrow_mut().add_relation(
+        "visits".to_string(),
+        RelationType::ManyToMany,
+        &john.id,
+        &central_park.id,
+    );
 
-    // Create a process for the move function
-    let weak_function = Rc::downgrade(&move_function);
-    let mut move_process = Process::new(
-        "MoveProcess".to_string(),
-        weak_function.clone(),
+    // 状態の設定
+    john.get_state().borrow_mut().set("age".to_string(), Value::Integer(30));
+    mary.get_state().borrow_mut().set("age".to_string(), Value::Integer(28));
+    acme_corp.get_state().borrow_mut().set("employee_count".to_string(), Value::Integer(2));
+
+    // 関数とプロセスの追加
+    let john_clone = Rc::clone(&john);
+    let age_function = Rc::new(Function::new("age_increment".to_string(), Rc::downgrade(&john)));
+    let age_process = Rc::new(Process::new(
+        "increment_age".to_string(),
+        Rc::downgrade(&age_function),
         Box::new(move || {
-            if let Some(function) = weak_function.upgrade() {
-                if let Some(entity) = function.owner.upgrade() {
-                    let mut state = entity.state.borrow_mut();
-                    if let Some(StateValue::Array(position)) = state.get("position") {
-                        if let (StateValue::Integer(x), StateValue::Integer(y)) = (&position[0], &position[1]) {
-                            let new_position = StateValue::Array(vec![
-                                StateValue::Integer(x + 1),
-                                StateValue::Integer(y + 1)
-                            ].into());
-                            state.set("position".to_string(), new_position);
-                        }
+            if let Some(age) = john_clone.get_state().borrow().get("age") {
+                if let Value::Integer(current_age) = age {
+                    john_clone.get_state().borrow_mut().set("age".to_string(), Value::Integer(current_age + 1));
+                }
+            }
+        }),
+    ));
+    age_function.add_process(age_process);
+    john.add_function("age_increment".to_string(), age_function);
+
+    // シミュレーションの実行
+    println!("Initial state:");
+    print_model_state(&model.borrow());
+
+    for _ in 0..5 {
+        model.borrow_mut().proceed();
+        // ここで各エンティティの関数を実行する
+        for entity in model.borrow().get_all_entities() {
+            if let Some(age_func) = entity.get_function("age_increment") {
+                for (_name, process) in age_func.processes.borrow().iter() {
+                    if process.check_condition() {
+                        process.execute();
                     }
                 }
             }
-        })
-    );
-
-    move_process.set_condition(Box::new(AlwaysTrueCondition {}));
-
-    // Add the process to the function
-    move_function.add_process(move_process);
-
-    // Add the function to the entity
-    moving_entity.add_function(move_function);
-
-    // Add the moving entity to the model
-    model.add_entity(moving_entity.clone());
-
-    // Create the second entity (StaticEntity)
-    let mut state2 = State::new();
-    state2.set("name".to_string(), StateValue::String("StaticEntity".to_string()));
-    
-    let static_entity = Rc::new(Entity::new(
-        "StaticEntity".to_string(),
-        EntityType::Custom("StaticEntity".to_string()),
-        state2
-    ));
-
-    // Add the static entity to the model
-    model.add_entity(static_entity.clone());
-
-    // Add a relation between entities
-    moving_entity.add_relation(static_entity.id, RelationType::Custom("Observes".to_string()));
-
-    // Run simulation
-    model.simulate(10);
-
-    // Print final state
-    println!("Final model state: {}", model);
-
-    // Print relations
-    for entity in &model.entities {
-        println!("Entity {} relations:", entity.name);
-        for (relation_type, targets) in entity.get_relations() {
-            println!("  {:?}: {:?}", relation_type, targets);
         }
+    }
+
+    println!("\nAfter 5 time steps:");
+    print_model_state(&model.borrow());
+}
+
+fn print_model_state(model: &Model) {
+    for entity in model.get_all_entities() {
+        println!("Entity: {} ({})", entity.name, entity.entity_type);
+        println!("  State:");
+        let state = entity.get_state().borrow();
+        for (key, value) in state.iter() {
+            println!("    {}: {:?}", key, value);
+        }
+        println!("  Relations:");
+        for relation in entity.get_all_relations() {
+            if let Some(other_entity) = relation.get_other_entity(&entity) {
+                if let Some(other) = other_entity.upgrade() {
+                    println!("    {} -> {}", relation.name, other.name);
+                }
+            }
+        }
+        println!();
     }
 }
