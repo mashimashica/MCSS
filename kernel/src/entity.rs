@@ -33,8 +33,8 @@ impl Entity {
         &self.state
     }
 
-    pub fn add_function(&self, name: String, function: Rc<Function>) {
-        self.functions.borrow_mut().insert(name, function);
+    pub fn add_function(&self, function: Rc<Function>) {
+        self.functions.borrow_mut().insert(function.name.clone(), function);
     }
 
     pub fn get_function(&self, name: &str) -> Option<Rc<Function>> {

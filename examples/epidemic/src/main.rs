@@ -59,7 +59,10 @@ fn main() {
         }),
     ));
     age_function.add_process(age_process);
-    john.add_function("age_increment".to_string(), age_function);
+    john.add_function(age_function);
+    if let Some(age_func) = john.get_function("age_increment") {
+        age_func.activate();
+    }
 
     // シミュレーションの実行
     println!("Initial state:");
@@ -71,9 +74,7 @@ fn main() {
         for entity in model.borrow().get_all_entities() {
             if let Some(age_func) = entity.get_function("age_increment") {
                 for (_name, process) in age_func.processes.borrow().iter() {
-                    if process.check_condition() {
-                        process.execute();
-                    }
+                    process.execute();
                 }
             }
         }

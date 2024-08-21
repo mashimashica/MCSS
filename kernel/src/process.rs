@@ -29,10 +29,14 @@ impl Process {
     }
 
     pub fn execute(&self) {
-        (self.action)();
+        if let Some(function) = self.owner.upgrade() {
+            if function.is_active() & self.check_condition() {
+                (self.action)();
+            }
+        }
     }
 
-    pub fn check_condition(&self) -> bool {
+    fn check_condition(&self) -> bool {
         if let Some(condition) = &self.condition {
             if let Some(function) = self.owner.upgrade() {
                 if let Some(owner_entity) = function.owner.upgrade() {
@@ -40,7 +44,7 @@ impl Process {
                 }
             }
         }
-        false
+        true
     }
 }
 
