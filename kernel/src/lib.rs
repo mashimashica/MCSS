@@ -5,7 +5,11 @@ mod function;
 mod process;
 mod model;
 mod types;
+mod context;
+mod result;
 
+pub use context::{ReadOnlyEntity, ReadOnlyFunction, ReadOnlyRelation, ReadOnlyModel, ExecutionContext};
+pub use result::{ExecutionResult, EntityCreationInfo, RelationCreationInfo, FunctionCreationInfo, ProcessCreationInfo};
 pub use entity::Entity;
 pub use variable::{Variable, Value};
 pub use relation::Relation;

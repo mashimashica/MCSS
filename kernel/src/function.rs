@@ -4,6 +4,7 @@ use std::rc::{Rc, Weak};
 use crate::variable::Variable;
 use crate::process::Process;
 use crate::entity::Entity;
+use crate::context::ReadOnlyFunction;
 
 #[derive(Debug)]
 pub struct Function {
@@ -36,6 +37,10 @@ impl Function {
     pub fn get_process(&self, name: &str) -> Option<Rc<Process>> {
         self.processes.borrow().get(name).cloned()
     }
+    
+    pub fn get_all_processes(&self) -> Vec<Rc<Process>> {
+        self.processes.borrow().values().cloned().collect()
+    }
 
     pub fn remove_process(&self, name: &str) -> Option<Rc<Process>> {
         self.processes.borrow_mut().remove(name)
@@ -52,4 +57,19 @@ impl Function {
     pub fn deactivate(&self) {
         self.active_status.set(false);
     }   
+}
+
+// ReadOnlyFunction トレイトの実装
+impl ReadOnlyFunction for Function {
+    fn get_name(&self) -> &str {
+        &self.name
+    }
+
+    fn get_parameter(&self) -> &RefCell<Variable> {
+        &self.parameter
+    }
+
+    fn is_active(&self) -> bool {
+        self.is_active()
+    }
 }

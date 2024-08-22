@@ -2,20 +2,20 @@ use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum EntityType {
-    Person,
-    Household,
-    Organization,
-    Location,
+    Agent,
+    Spot,
+    AgentSet,
+    SpotSet,
     Custom(String),
 }
 
 impl fmt::Display for EntityType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            EntityType::Person => write!(f, "Person"),
-            EntityType::Household => write!(f, "Household"),
-            EntityType::Organization => write!(f, "Organization"),
-            EntityType::Location => write!(f, "Location"),
+            EntityType::Agent => write!(f, "Agent"),
+            EntityType::Spot => write!(f, "Spot"),
+            EntityType::AgentSet => write!(f, "Agent Set"),
+            EntityType::SpotSet => write!(f, "Spot Set"),
             EntityType::Custom(s) => write!(f, "Custom({})", s),
         }
     }

@@ -2,6 +2,9 @@ use std::rc::Weak;
 use uuid::Uuid;
 use crate::entity::Entity;
 use crate::types::RelationType;
+use crate::context::ReadOnlyRelation;
+use crate::context::ReadOnlyEntity;
+use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct Relation {
@@ -33,5 +36,28 @@ impl Relation {
 
     pub fn get_type(&self) -> &RelationType {
         &self.relation_type
+    }
+}
+
+// ReadOnlyRelation トレイトの実装
+impl ReadOnlyRelation for Relation {
+    fn get_id(&self) -> Uuid {
+        self.id
+    }
+
+    fn get_name(&self) -> &str {
+        &self.name
+    }
+
+    fn get_relation_type(&self) -> &RelationType {
+        &self.relation_type
+    }
+
+    fn get_entity1(&self) -> Option<Rc<dyn ReadOnlyEntity>> {
+        self.entity1.upgrade().map(|e| e as Rc<dyn ReadOnlyEntity>)
+    }
+
+    fn get_entity2(&self) -> Option<Rc<dyn ReadOnlyEntity>> {
+        self.entity2.upgrade().map(|e| e as Rc<dyn ReadOnlyEntity>)
     }
 }

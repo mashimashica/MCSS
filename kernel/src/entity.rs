@@ -6,6 +6,7 @@ use crate::relation::Relation;
 use crate::types::EntityType;
 use crate::variable::Variable;
 use crate::function::Function;
+use crate::context::{ReadOnlyEntity, ReadOnlyFunction, ReadOnlyRelation};
 
 #[derive(Debug)]
 pub struct Entity {
@@ -39,6 +40,10 @@ impl Entity {
 
     pub fn get_function(&self, name: &str) -> Option<Rc<Function>> {
         self.functions.borrow().get(name).cloned()
+    }
+    
+    pub fn get_all_functions(&self) -> Vec<Rc<Function>> {
+        self.functions.borrow().values().cloned().collect()
     }
 
     pub fn remove_function(&self, name: &str) -> Option<Rc<Function>> {
@@ -75,5 +80,32 @@ impl Entity {
                 relations.remove(name);
             }
         }
+    }
+}
+
+// ReadOnlyEntity トレイトの実装
+impl ReadOnlyEntity for Entity {
+    fn get_id(&self) -> Uuid {
+        self.id
+    }
+
+    fn get_name(&self) -> &str {
+        &self.name
+    }
+
+    fn get_entity_type(&self) -> &EntityType {
+        &self.entity_type
+    }
+
+    fn get_state(&self) -> &RefCell<Variable> {
+        &self.state
+    }
+
+    fn get_function(&self, name: &str) -> Option<Rc<dyn ReadOnlyFunction>> {
+        self.get_function(name).map(|f| f as Rc<dyn ReadOnlyFunction>)
+    }
+
+    fn get_relations(&self, name: &str) -> Vec<Rc<dyn ReadOnlyRelation>> {
+        self.get_relations(name).into_iter().map(|r| r as Rc<dyn ReadOnlyRelation>).collect()
     }
 }

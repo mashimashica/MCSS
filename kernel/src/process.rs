@@ -2,19 +2,21 @@ use std::fmt;
 use std::rc::Weak;
 use crate::function::Function;
 use crate::entity::Entity;
+use crate::context::ExecutionContext;
+use crate::result::ExecutionResult;
 
 pub struct Process {
     pub name: String,
     pub owner: Weak<Function>,
     condition: Option<Box<dyn Condition>>,
-    action: Box<dyn Fn() + 'static>,
+    action: Box<dyn Fn(&ExecutionContext) -> Vec<ExecutionResult> + 'static>, // 変更
 }
 
 impl Process {
     pub fn new(
         name: String,
         owner: Weak<Function>,
-        action: Box<dyn Fn() + 'static>,
+        action: Box<dyn Fn(&ExecutionContext) -> Vec<ExecutionResult> + 'static>, // 変更
     ) -> Self {
         Process {
             name,
@@ -28,12 +30,13 @@ impl Process {
         self.condition = Some(condition);
     }
 
-    pub fn execute(&self) {
+    pub fn execute(&self, context: &ExecutionContext) -> Vec<ExecutionResult> {
         if let Some(function) = self.owner.upgrade() {
-            if function.is_active() & self.check_condition() {
-                (self.action)();
+            if function.is_active() && self.check_condition() {
+                return (self.action)(context);
             }
         }
+        vec![]
     }
 
     fn check_condition(&self) -> bool {
