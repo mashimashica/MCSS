@@ -1,5 +1,6 @@
 use std::rc::Rc;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use kernel::{
     Model,
     Entity,
@@ -9,6 +10,8 @@ use kernel::{
     Process,
     ExecutionResult,
     EntityCreationInfo,
+    FunctionCreationInfo,
+    ProcessCreationInfo,
     ExecutionContext,
     ReadOnlyEntity,
     ReadOnlyRelation,
@@ -80,19 +83,43 @@ fn add_birth_function(entity: &Rc<Entity>) {
     let birth_process = Rc::new(Process::new(
         "give_birth".to_string(),
         Rc::downgrade(&birth_function),
-        Box::new(move |_context: &ExecutionContext| {
+        Box::new(move |context: &ExecutionContext| {
             let mut results = Vec::new();
             let mut rng = rand::thread_rng();
-            if rng.gen_bool(0.1) {  // 10% chance of giving birth
-                println!("  {} is giving birth!", entity_clone.get_name());
-                let new_entity_info = EntityCreationInfo {
-                    name: format!("Baby of {}", entity_clone.get_name()),
-                    entity_type: EntityType::Agent,
-                    initial_state: vec![("age".to_string(), Value::Integer(0))].into_iter().collect(),
-                    functions: vec![],
-                    relations: vec![],
-                };
-                results.push(ExecutionResult::CreateEntity(new_entity_info));
+            
+            if let Some(Value::Integer(age)) = context.owner_entity.get_state().borrow().get("age") {
+                if *age >= 18 && rng.gen_bool(0.1) {
+                    println!("  {} (age {}) is giving birth!", entity_clone.get_name(), age);
+                    let new_entity_info = EntityCreationInfo {
+                        name: format!("Baby of {}", entity_clone.get_name()),
+                        entity_type: EntityType::Agent,
+                        initial_state: vec![("age".to_string(), Value::Integer(0))].into_iter().collect(),
+                        functions: vec![
+                            FunctionCreationInfo {
+                                name: "age_increment".to_string(),
+                                initial_parameters: HashMap::new(),
+                                processes: vec![
+                                    ProcessCreationInfo {
+                                        name: "increment_age".to_string(),
+                                        action: Box::new(|context: &ExecutionContext| {
+                                            let mut results = Vec::new();
+                                            if let Some(age) = context.owner_entity.get_state().borrow().get("age") {
+                                                if let Value::Integer(current_age) = age {
+                                                    let new_age = current_age + 1;
+                                                    println!("  Incrementing age of {} from {} to {}", context.owner_entity.get_name(), current_age, new_age);
+                                                    results.push(ExecutionResult::UpdateEntityState(context.owner_entity.get_id(), "age".to_string(), Value::Integer(new_age)));
+                                                }
+                                            }
+                                            results
+                                        }),
+                                    },
+                                ],
+                            },
+                        ],
+                        relations: vec![],
+                    };
+                    results.push(ExecutionResult::CreateEntity(new_entity_info));
+                }
             }
             results
         }),

@@ -41,7 +41,7 @@ impl Entity {
     pub fn get_function(&self, name: &str) -> Option<Rc<Function>> {
         self.functions.borrow().get(name).cloned()
     }
-    
+
     pub fn get_all_functions(&self) -> Vec<Rc<Function>> {
         self.functions.borrow().values().cloned().collect()
     }
@@ -83,7 +83,6 @@ impl Entity {
     }
 }
 
-// ReadOnlyEntity トレイトの実装
 impl ReadOnlyEntity for Entity {
     fn get_id(&self) -> Uuid {
         self.id

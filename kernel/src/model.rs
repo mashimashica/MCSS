@@ -22,7 +22,7 @@ pub enum ModelError {
 pub struct Model {
     entities: RefCell<HashMap<Uuid, Rc<Entity>>>,
     relations: RefCell<HashMap<Uuid, Rc<Relation>>>,
-    processes: RefCell<Vec<Rc<Process>>>, // 追加
+    processes: RefCell<Vec<Rc<Process>>>,
 }
 
 impl Model {
@@ -30,7 +30,7 @@ impl Model {
         Self {
             entities: RefCell::new(HashMap::new()),
             relations: RefCell::new(HashMap::new()),
-            processes: RefCell::new(Vec::new()), // 追加
+            processes: RefCell::new(Vec::new()),
         }
     }
 
@@ -265,14 +265,17 @@ impl Model {
             }
 
             // Remove all scheduled processes for this entity's functions
-            // self.scheduled_processes.borrow_mut().values_mut().for_each(|processes| {
-            //     processes.retain(|p| p.process.owner.upgrade().and_then(|f| f.owner.upgrade()).map(|e| e.id) != Some(id));
-            // });
-
-            // Remove all queued processes for this entity's functions
-            // self.process_queue.borrow_mut().retain(|(_, p)| 
-            //     p.owner.upgrade().and_then(|f| f.owner.upgrade()).map(|e| e.id) != Some(id)
-            // );
+            self.processes.borrow_mut().retain(|process| {
+                if let Some(function) = process.owner.upgrade() {
+                    if let Some(process_entity) = function.owner.upgrade() {
+                        process_entity.id != id
+                    } else {
+                        true
+                    }
+                } else {
+                    true
+                }
+            });
         }
     }
 
@@ -337,15 +340,10 @@ impl Model {
     fn remove_function_internal(&self, entity_id: Uuid, function_name: String) {
         if let Some(entity) = self.entities.borrow().get(&entity_id) {
             if let Some(_function) = entity.remove_function(&function_name) {
-                // Remove all scheduled processes for this function
-                // self.scheduled_processes.borrow_mut().values_mut().for_each(|processes| {
-                //     processes.retain(|p| p.process.owner.upgrade().map(|f| f.name) != Some(function_name.clone()));
-                // });
-
-                // Remove all queued processes for this function
-                // self.process_queue.borrow_mut().retain(|(_, p)| 
-                //     p.owner.upgrade().map(|f| f.name) != Some(function_name.clone())
-                // );
+                // 関数に関連するプロセスをモデルから削除
+                self.processes.borrow_mut().retain(|process| {
+                    process.owner.upgrade().map(|f| f.name != function_name).unwrap_or(true)
+                });
             }
         }
     }
@@ -375,6 +373,7 @@ impl Model {
                     process_info.action
                 ));
                 function.add_process(Rc::clone(&process));
+                self.add_process(Rc::clone(&process));
             }
         }
     }

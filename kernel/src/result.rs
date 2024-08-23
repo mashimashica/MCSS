@@ -37,7 +37,6 @@ pub struct FunctionCreationInfo {
     pub processes: Vec<ProcessCreationInfo>,
 }
 
-// #[derive(Debug)]
 pub struct ProcessCreationInfo {
     pub name: String,
     pub action: Box<dyn Fn(&ExecutionContext) -> Vec<ExecutionResult>>,

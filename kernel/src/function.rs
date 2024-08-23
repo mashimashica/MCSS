@@ -37,7 +37,7 @@ impl Function {
     pub fn get_process(&self, name: &str) -> Option<Rc<Process>> {
         self.processes.borrow().get(name).cloned()
     }
-    
+
     pub fn get_all_processes(&self) -> Vec<Rc<Process>> {
         self.processes.borrow().values().cloned().collect()
     }
@@ -59,7 +59,6 @@ impl Function {
     }   
 }
 
-// ReadOnlyFunction トレイトの実装
 impl ReadOnlyFunction for Function {
     fn get_name(&self) -> &str {
         &self.name
