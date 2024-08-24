@@ -20,6 +20,10 @@ impl Variable {
         self.values.insert(key, value);
     }
 
+    pub fn remove(&mut self, key: &str) {
+        self.values.remove(key);
+    }
+
     pub fn iter(&self) -> std::collections::hash_map::Iter<'_, String, Value> {
         self.values.iter()
     }

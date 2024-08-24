@@ -1,53 +1,50 @@
 use std::fmt;
 use std::rc::Weak;
 use crate::function::Function;
-use crate::entity::Entity;
 use crate::context::ExecutionContext;
 use crate::result::ExecutionResult;
+use std::cell::RefCell;
 
 pub struct Process {
     pub name: String,
     pub owner: Weak<Function>,
-    condition: Option<Box<dyn Condition>>,
-    action: Box<dyn Fn(&ExecutionContext) -> Vec<ExecutionResult> + 'static>, // 変更
+    condition: RefCell<Option<Box<dyn Condition>>>,
+    action: Box<dyn Fn(&ExecutionContext) -> Vec<ExecutionResult> + 'static>,
 }
 
 impl Process {
     pub fn new(
         name: String,
         owner: Weak<Function>,
-        action: Box<dyn Fn(&ExecutionContext) -> Vec<ExecutionResult> + 'static>, // 変更
+        action: Box<dyn Fn(&ExecutionContext) -> Vec<ExecutionResult> + 'static>,
     ) -> Self {
         Process {
             name,
             owner,
-            condition: None,
+            condition: RefCell::new(None),
             action,
         }
     }
 
-    pub fn set_condition(&mut self, condition: Box<dyn Condition>) {
-        self.condition = Some(condition);
+    pub fn set_condition(&self, condition: Box<dyn Condition>) {
+        *self.condition.borrow_mut() = Some(condition);
+    }
+
+    pub fn remove_condition(&self) {
+        *self.condition.borrow_mut() = None;
     }
 
     pub fn execute(&self, context: &ExecutionContext) -> Vec<ExecutionResult> {
         if let Some(function) = self.owner.upgrade() {
-            if function.is_active() && self.check_condition() {
+            if function.is_active() && self.check_condition(context) {
                 return (self.action)(context);
             }
         }
         vec![]
     }
 
-    fn check_condition(&self) -> bool {
-        if let Some(condition) = &self.condition {
-            if let Some(function) = self.owner.upgrade() {
-                if let Some(owner_entity) = function.owner.upgrade() {
-                    return condition.is_met(&owner_entity);
-                }
-            }
-        }
-        true
+    fn check_condition(&self, context: &ExecutionContext) -> bool {
+        self.condition.borrow().as_ref().map_or(true, |c| c.is_met(context))
     }
 }
 
@@ -56,20 +53,20 @@ impl fmt::Debug for Process {
         f.debug_struct("Process")
             .field("name", &self.name)
             .field("owner", &self.owner)
-            .field("condition", &self.condition.is_some())
+            .field("condition", &self.condition.borrow().is_some())
             .finish()
     }
 }
 
 pub trait Condition: fmt::Debug {
-    fn is_met(&self, entity: &Entity) -> bool;
+    fn is_met(&self, context: &ExecutionContext) -> bool;
 }
 
 #[derive(Debug)]
 pub struct AlwaysTrueCondition {}
 
 impl Condition for AlwaysTrueCondition {
-    fn is_met(&self, _entity: &Entity) -> bool {
+    fn is_met(&self, _context: &ExecutionContext) -> bool {
         true
     }
 }

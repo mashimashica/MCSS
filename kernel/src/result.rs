@@ -1,14 +1,15 @@
 use std::fmt;
 use std::collections::HashMap;
-// use std::cell::RefCell;
 use uuid::Uuid;
 use crate::context::ExecutionContext;
 use crate::types::{EntityType, RelationType};
+use crate::process::Condition;
 use crate::variable::Value;
 
 #[derive(Debug)]
 pub enum ExecutionResult {
     UpdateEntityState(Uuid, String, Value),
+    DeleteEntityState(Uuid, String),
     CreateEntity(EntityCreationInfo),
     DeleteEntity(Uuid),
     CreateRelation(RelationCreationInfo),
@@ -17,8 +18,14 @@ pub enum ExecutionResult {
     RemoveFunction(Uuid, String),
     ActivateFunction(Uuid, String),
     DeactivateFunction(Uuid, String),
+    UpdateFunctionParameter(Uuid, String, String, Value),
+    DeleteFunctionParameter(Uuid, String, String),
     AddProcess(Uuid, String, ProcessCreationInfo),
     RemoveProcess(Uuid, String, String),
+    AddCondition(Uuid, String, String, Box<dyn Condition>),
+    RemoveCondition(Uuid, String, String),
+    AddRelationMetadata(Uuid, String, Value),
+    RemoveRelationMetadata(Uuid, String),
 }
 
 #[derive(Debug)]
@@ -40,6 +47,7 @@ pub struct FunctionCreationInfo {
 pub struct ProcessCreationInfo {
     pub name: String,
     pub action: Box<dyn Fn(&ExecutionContext) -> Vec<ExecutionResult>>,
+    pub condition: Option<Box<dyn Condition>>,
 }
 
 impl fmt::Debug for ProcessCreationInfo {
@@ -47,6 +55,7 @@ impl fmt::Debug for ProcessCreationInfo {
         f.debug_struct("ProcessCreationInfo")
             .field("name", &self.name)
             .field("action", &"<function>")
+            .field("condition", &self.condition.is_some())
             .finish()
     }
 }
@@ -55,6 +64,7 @@ impl fmt::Debug for ProcessCreationInfo {
 pub struct RelationCreationInfo {
     pub name: String,
     pub relation_type: RelationType,
-    pub target_entity_id: Option<Uuid>, // None if the target entity is also being created
-    pub target_entity_name: Option<String>, // Used when the target entity is also being created
+    pub target_entity_id: Option<Uuid>,
+    pub target_entity_name: Option<String>,
+    pub metadata: Option<HashMap<String, Value>>,
 }

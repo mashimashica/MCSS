@@ -12,7 +12,7 @@ pub use context::{ReadOnlyEntity, ReadOnlyFunction, ReadOnlyRelation, ReadOnlyMo
 pub use result::{ExecutionResult, EntityCreationInfo, RelationCreationInfo, FunctionCreationInfo, ProcessCreationInfo};
 pub use entity::Entity;
 pub use variable::{Variable, Value};
-pub use relation::Relation;
+pub use relation::{Relation, RelationshipDefinition, RelationshipRegistry};
 pub use function::Function;
 pub use process::{Process, Condition, AlwaysTrueCondition};
 pub use model::Model;

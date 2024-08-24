@@ -1,14 +1,15 @@
 use std::rc::Rc;
-use std::cell::RefCell;
+use std::cell::{Ref, RefCell};
+use std::collections::HashMap;
 use uuid::Uuid;
 use crate::types::{EntityType, RelationType};
-use crate::variable::Variable;
+use crate::variable::{Variable, Value};
 
 pub trait ReadOnlyEntity {
     fn get_id(&self) -> Uuid;
     fn get_name(&self) -> &str;
     fn get_entity_type(&self) -> &EntityType;
-    fn get_state(&self) -> &RefCell<Variable>;
+    fn get_state(&self) -> Ref<Variable>;
     fn get_function(&self, name: &str) -> Option<Rc<dyn ReadOnlyFunction>>;
     fn get_relations(&self, name: &str) -> Vec<Rc<dyn ReadOnlyRelation>>;
 }
@@ -25,6 +26,8 @@ pub trait ReadOnlyRelation {
     fn get_relation_type(&self) -> &RelationType;
     fn get_entity1(&self) -> Option<Rc<dyn ReadOnlyEntity>>;
     fn get_entity2(&self) -> Option<Rc<dyn ReadOnlyEntity>>;
+    fn get_meta_value(&self, key: &str) -> Option<Value>;
+    fn iter_meta(&self) -> HashMap<String, Value>; // 変更: イテレータではなくHashMapを返す
 }
 
 pub trait ReadOnlyModel {

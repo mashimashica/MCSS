@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::rc::{Rc, Weak};
-use std::cell::RefCell;
+use std::cell::{Ref, RefCell};
 use uuid::Uuid;
 use crate::relation::Relation;
 use crate::types::EntityType;
@@ -96,8 +96,8 @@ impl ReadOnlyEntity for Entity {
         &self.entity_type
     }
 
-    fn get_state(&self) -> &RefCell<Variable> {
-        &self.state
+    fn get_state(&self) -> Ref<Variable> {
+        self.state.borrow()
     }
 
     fn get_function(&self, name: &str) -> Option<Rc<dyn ReadOnlyFunction>> {

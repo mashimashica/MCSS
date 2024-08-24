@@ -3,11 +3,11 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use uuid::Uuid;
 use crate::entity::Entity;
-use crate::relation::Relation;
+use crate::relation::{Relation, RelationshipDefinition, RelationshipRegistry};
 use crate::types::{EntityType, RelationType};
 use crate::context::{ExecutionContext, ReadOnlyRelation, ReadOnlyModel, ReadOnlyEntity};
 use crate::result::{ExecutionResult, EntityCreationInfo, RelationCreationInfo, FunctionCreationInfo, ProcessCreationInfo};
-use crate::process::Process;
+use crate::process::{Process, Condition};
 use crate::function::Function;
 use crate::variable::Value;
 
@@ -17,11 +17,14 @@ pub enum ModelError {
     RelationNotFound(Uuid),
     RelationAlreadyExists(String),
     InvalidRelationType { name: String, relation_type: RelationType },
+    UndefinedRelation(String),
+    InvalidRelationEntityTypes,
 }
 
 pub struct Model {
     entities: RefCell<HashMap<Uuid, Rc<Entity>>>,
     relations: RefCell<HashMap<Uuid, Rc<Relation>>>,
+    relationship_registry: RefCell<RelationshipRegistry>,
     processes: RefCell<Vec<Rc<Process>>>,
 }
 
@@ -30,6 +33,7 @@ impl Model {
         Self {
             entities: RefCell::new(HashMap::new()),
             relations: RefCell::new(HashMap::new()),
+            relationship_registry: RefCell::new(RelationshipRegistry::new()),
             processes: RefCell::new(Vec::new()),
         }
     }
@@ -85,32 +89,57 @@ impl Model {
             .collect()
     }
 
+    pub fn define_relationship(
+        &self,
+        name: String,
+        source_type: EntityType,
+        target_type: EntityType,
+        relation_type: RelationType,
+    ) -> Result<(), String> {
+        let definition = RelationshipDefinition {
+            name: name.clone(),
+            source_type,
+            target_type,
+            relation_type,
+        };
+        self.relationship_registry.borrow_mut().add_definition(definition);
+        Ok(())
+    }
+
     pub fn add_relation(
         &self,
         name: String,
-        relation_type: RelationType,
         entity1_id: &Uuid,
         entity2_id: &Uuid,
     ) -> Result<Rc<Relation>, ModelError> {
-        let entities = self.entities.borrow();
-        let entity1 = entities.get(entity1_id).ok_or(ModelError::EntityNotFound(*entity1_id))?;
-        let entity2 = entities.get(entity2_id).ok_or(ModelError::EntityNotFound(*entity2_id))?;
+        let registry = self.relationship_registry.borrow();
+        let definition = registry.get_definition(&name)
+            .ok_or(ModelError::UndefinedRelation(name.clone()))?;
 
-        // Check RelationType constraints
-        match relation_type {
+        let entity1 = self.get_entity(entity1_id)
+            .ok_or(ModelError::EntityNotFound(*entity1_id))?;
+        let entity2 = self.get_entity(entity2_id)
+            .ok_or(ModelError::EntityNotFound(*entity2_id))?;
+
+        if entity1.entity_type != definition.source_type || 
+           entity2.entity_type != definition.target_type {
+            return Err(ModelError::InvalidRelationEntityTypes);
+        }
+
+        match definition.relation_type {
             RelationType::OneToOne => {
                 if !entity1.get_relations(&name).is_empty() || !entity2.get_relations(&name).is_empty() {
-                    return Err(ModelError::InvalidRelationType { name, relation_type });
+                    return Err(ModelError::InvalidRelationType { name, relation_type: definition.relation_type });
                 }
             },
             RelationType::OneToMany => {
                 if !entity1.get_relations(&name).is_empty() {
-                    return Err(ModelError::InvalidRelationType { name, relation_type });
+                    return Err(ModelError::InvalidRelationType { name, relation_type: definition.relation_type });
                 }
             },
             RelationType::ManyToOne => {
                 if !entity2.get_relations(&name).is_empty() {
-                    return Err(ModelError::InvalidRelationType { name, relation_type });
+                    return Err(ModelError::InvalidRelationType { name, relation_type: definition.relation_type });
                 }
             },
             RelationType::ManyToMany => {} // No constraints
@@ -118,9 +147,9 @@ impl Model {
 
         let relation = Rc::new(Relation::new(
             name.clone(),
-            relation_type,
-            Rc::downgrade(entity1),
-            Rc::downgrade(entity2),
+            definition.relation_type,
+            Rc::downgrade(&entity1),
+            Rc::downgrade(&entity2),
         ));
 
         entity1.add_relation(name.clone(), Rc::downgrade(&relation));
@@ -176,29 +205,14 @@ impl Model {
                 }
             }
         }
-    
         self.apply_results(results);
     }
 
-    // ExecutionResultを適用するメソッド
     fn apply_results(&self, results: Vec<ExecutionResult>) {
         for result in results {
             match result {
                 ExecutionResult::CreateEntity(info) => {
-                    let entity = self.create_entity_internal(info);
-                    // Handle relations for the new entity
-                    for (relation_name, relation_infos) in entity.relations.borrow().iter() {
-                        for relation_info in relation_infos {
-                            if let Some(relation) = relation_info.upgrade() {
-                                self.create_relation_internal(RelationCreationInfo {
-                                    name: relation_name.clone(),
-                                    relation_type: relation.relation_type,
-                                    target_entity_id: Some(relation.entity2.upgrade().unwrap().id),
-                                    target_entity_name: None,
-                                }, Some(entity.id));
-                            }
-                        }
-                    }
+                    self.create_entity_internal(info);
                 }
                 ExecutionResult::DeleteEntity(id) => {
                     self.delete_entity_internal(id);
@@ -230,21 +244,44 @@ impl Model {
                 ExecutionResult::UpdateEntityState(entity_id, key, value) => {
                     self.update_entity_state_internal(entity_id, key, value);
                 }
+                ExecutionResult::DeleteEntityState(entity_id, key) => {
+                    self.delete_entity_state_internal(entity_id, key);
+                }
+                ExecutionResult::UpdateFunctionParameter(entity_id, function_name, key, value) => {
+                    self.update_function_parameter_internal(entity_id, function_name, key, value);
+                }
+                ExecutionResult::DeleteFunctionParameter(entity_id, function_name, key) => {
+                    self.delete_function_parameter_internal(entity_id, function_name, key);
+                }
+                ExecutionResult::AddCondition(entity_id, function_name, process_name, condition) => {
+                    self.add_condition_internal(entity_id, function_name, process_name, condition);
+                }
+                ExecutionResult::RemoveCondition(entity_id, function_name, process_name) => {
+                    self.remove_condition_internal(entity_id, function_name, process_name);
+                }
+                ExecutionResult::AddRelationMetadata(relation_id, key, value) => {
+                    self.add_relation_metadata_internal(relation_id, key, value);
+                }
+                ExecutionResult::RemoveRelationMetadata(relation_id, key) => {
+                    self.remove_relation_metadata_internal(relation_id, key);
+                }
             }
         }
     }
-
+    
     fn create_entity_internal(&self, info: EntityCreationInfo) -> Rc<Entity> {
         let entity = Rc::new(Entity::new(info.name, info.entity_type));
         
-        // Set initial state
         for (key, value) in info.initial_state {
             entity.get_state().borrow_mut().set(key, value);
         }
 
-        // Add functions
         for function_info in info.functions {
             self.add_function_internal(entity.id, function_info);
+        }
+
+        for relation_info in info.relations {
+            self.create_relation_internal(relation_info, Some(entity.id));
         }
 
         self.entities.borrow_mut().insert(entity.id, Rc::clone(&entity));
@@ -252,8 +289,7 @@ impl Model {
     }
 
     fn delete_entity_internal(&self, id: Uuid) {
-        if let Some(_entity) = self.entities.borrow_mut().remove(&id) {
-            // Remove all relations involving this entity
+        if let Some(entity) = self.entities.borrow_mut().remove(&id) {
             let relations_to_remove: Vec<Uuid> = self.relations.borrow()
                 .values()
                 .filter(|r| r.entity1.upgrade().map(|e| e.id) == Some(id) || r.entity2.upgrade().map(|e| e.id) == Some(id))
@@ -264,45 +300,48 @@ impl Model {
                 self.delete_relation_internal(relation_id);
             }
 
-            // Remove all scheduled processes for this entity's functions
             self.processes.borrow_mut().retain(|process| {
-                if let Some(function) = process.owner.upgrade() {
-                    if let Some(process_entity) = function.owner.upgrade() {
-                        process_entity.id != id
-                    } else {
-                        true
-                    }
-                } else {
-                    true
-                }
+                process.owner.upgrade()
+                    .and_then(|f| f.owner.upgrade())
+                    .map(|e| e.id != id)
+                    .unwrap_or(true)
             });
+
+            for function in entity.get_all_functions() {
+                self.remove_function_internal(id, function.name.clone());
+            }
         }
     }
 
     fn create_relation_internal(&self, info: RelationCreationInfo, source_entity_id: Option<Uuid>) {
+        let registry = self.relationship_registry.borrow();
+        let definition = registry.get_definition(&info.name)
+            .expect("Relation definition not found");
         let source_id = source_entity_id.unwrap_or(info.target_entity_id.unwrap());
-        let target_id = if let Some(id) = info.target_entity_id {
-            id
-        } else {
-            // Find the target entity by name
+        let target_id = info.target_entity_id.unwrap_or_else(|| {
             self.entities.borrow().values()
                 .find(|e| e.name == *info.target_entity_name.as_ref().unwrap())
                 .map(|e| e.id)
                 .expect("Target entity not found")
-        };
-    
+        });
+
         let relation = Rc::new(Relation::new(
-            info.name.clone(), // Clone here
-            info.relation_type,
+            info.name.clone(),
+            definition.relation_type,
             Rc::downgrade(&self.entities.borrow()[&source_id]),
             Rc::downgrade(&self.entities.borrow()[&target_id])
         ));
-    
+
         self.relations.borrow_mut().insert(relation.id, Rc::clone(&relation));
-    
-        // Add relation to both entities
+
         self.entities.borrow()[&source_id].add_relation(info.name.clone(), Rc::downgrade(&relation));
         self.entities.borrow()[&target_id].add_relation(info.name, Rc::downgrade(&relation));
+
+        if let Some(metadata) = info.metadata {
+            for (key, value) in metadata {
+                self.add_relation_metadata_internal(relation.id, key, value);
+            }
+        }
     }
 
     fn delete_relation_internal(&self, id: Uuid) {
@@ -319,16 +358,14 @@ impl Model {
     fn add_function_internal(&self, entity_id: Uuid, function_info: FunctionCreationInfo) {
         if let Some(entity) = self.entities.borrow().get(&entity_id) {
             let function = Rc::new(Function::new(
-                function_info.name,
+                function_info.name.clone(),
                 Rc::downgrade(entity)
             ));
 
-            // Set initial parameters
             for (key, value) in function_info.initial_parameters {
                 function.get_parameter().borrow_mut().set(key, value);
             }
 
-            // Add processes
             for process_info in function_info.processes {
                 self.add_process_internal(entity_id, function.name.clone(), process_info);
             }
@@ -339,8 +376,7 @@ impl Model {
 
     fn remove_function_internal(&self, entity_id: Uuid, function_name: String) {
         if let Some(entity) = self.entities.borrow().get(&entity_id) {
-            if let Some(_function) = entity.remove_function(&function_name) {
-                // 関数に関連するプロセスをモデルから削除
+            if entity.remove_function(&function_name).is_some() {
                 self.processes.borrow_mut().retain(|process| {
                     process.owner.upgrade().map(|f| f.name != function_name).unwrap_or(true)
                 });
@@ -374,6 +410,10 @@ impl Model {
                 ));
                 function.add_process(Rc::clone(&process));
                 self.add_process(Rc::clone(&process));
+
+                if let Some(condition) = process_info.condition {
+                    self.add_condition_internal(entity_id, function_name, process.name.clone(), condition);
+                }
             }
         }
     }
@@ -382,6 +422,7 @@ impl Model {
         if let Some(entity) = self.entities.borrow().get(&entity_id) {
             if let Some(function) = entity.get_function(&function_name) {
                 function.remove_process(&process_name);
+                self.processes.borrow_mut().retain(|p| p.name != process_name);
             }
         }
     }
@@ -389,6 +430,60 @@ impl Model {
     fn update_entity_state_internal(&self, entity_id: Uuid, key: String, value: Value) {
         if let Some(entity) = self.entities.borrow().get(&entity_id) {
             entity.get_state().borrow_mut().set(key, value);
+        }
+    }
+
+    fn delete_entity_state_internal(&self, entity_id: Uuid, key: String) {
+        if let Some(entity) = self.entities.borrow().get(&entity_id) {
+            entity.get_state().borrow_mut().remove(&key);
+        }
+    }
+
+    fn update_function_parameter_internal(&self, entity_id: Uuid, function_name: String, key: String, value: Value) {
+        if let Some(entity) = self.entities.borrow().get(&entity_id) {
+            if let Some(function) = entity.get_function(&function_name) {
+                function.get_parameter().borrow_mut().set(key, value);
+            }
+        }
+    }
+
+    fn delete_function_parameter_internal(&self, entity_id: Uuid, function_name: String, key: String) {
+        if let Some(entity) = self.entities.borrow().get(&entity_id) {
+            if let Some(function) = entity.get_function(&function_name) {
+                function.get_parameter().borrow_mut().remove(&key);
+            }
+        }
+    }
+
+    fn add_condition_internal(&self, entity_id: Uuid, function_name: String, process_name: String, condition: Box<dyn Condition>) {
+        if let Some(entity) = self.entities.borrow().get(&entity_id) {
+            if let Some(function) = entity.get_function(&function_name) {
+                if let Some(process) = function.get_process(&process_name) {
+                    process.set_condition(condition);
+                }
+            }
+        }
+    }
+
+    fn remove_condition_internal(&self, entity_id: Uuid, function_name: String, process_name: String) {
+        if let Some(entity) = self.entities.borrow().get(&entity_id) {
+            if let Some(function) = entity.get_function(&function_name) {
+                if let Some(process) = function.get_process(&process_name) {
+                    process.remove_condition();
+                }
+            }
+        }
+    }
+
+    fn add_relation_metadata_internal(&self, relation_id: Uuid, key: String, value: Value) {
+        if let Some(relation) = self.relations.borrow().get(&relation_id) {
+            relation.add_metadata(key, value);
+        }
+    }
+
+    fn remove_relation_metadata_internal(&self, relation_id: Uuid, key: String) {
+        if let Some(relation) = self.relations.borrow().get(&relation_id) {
+            relation.remove_metadata(&key);
         }
     }
 }
